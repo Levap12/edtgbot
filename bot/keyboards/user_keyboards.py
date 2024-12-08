@@ -8,7 +8,7 @@ def main_menu() -> InlineKeyboardMarkup:
 
     ikb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='КУПИТЬ VPN', callback_data='buyvpn')],
-        [InlineKeyboardButton(text='ПОЛУЧИТЬ БЕСПЛАТНО', callback_data='chose_device')],
+        [InlineKeyboardButton(text='ПРОБНЫЙ ПЕРИОД', callback_data='chose_device')],
         [InlineKeyboardButton(text='ПОМОЩЬ', url='https://t.me/nyrpeisov')]
     ])
     return ikb

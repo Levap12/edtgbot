@@ -69,9 +69,16 @@ async def cmd_start(message: types.Message):
                 f'Username: @{message.from_user.username}'
             )
             await bot.send_message(chat_id=-1002286289168, text=group_message)
-
+        text = '<b>Добро пожаловать в VOX VPN!</b>' \
+               '\n\nМы гарантируем стабильность и высокую скорость!' \
+               '\n\nА главное – наш VPN отлично работает как на телефоне, так и на ПК.' \
+               '\n\nПогнали!' \
+               '\n\n<b>Поддержка</b> @voxwork' \
+               '\n<b>Новостной канал</b> @voxglobal' \
+               '\nС уважением,' \
+               '\nКоманда VOX VPN ⚡️'
         # Отправляем сообщение с картинкой и клавиатурой
-        await message.answer_photo(photo=image_path, reply_markup=user_keyboards.main_menu())
+        await message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
     except Exception as e:
         logger.error(f"Ошибка в обработчике /start: {e}")
         await message.answer("Произошла ошибка при обработке команды /start.")
@@ -100,10 +107,18 @@ async def handle_button_click(callback: types.CallbackQuery):
         elif action == 'back_to_menu':
             image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
             logger.info(f"Отправляем сообщение для получения меню.")
-            await callback.message.answer_photo(photo=image_path, reply_markup=user_keyboards.main_menu())
+            text = '<b>Добро пожаловать в VOX VPN!</b>' \
+                   '\n\nМы гарантируем стабильность и высокую скорость!' \
+                   '\n\nА главное – наш VPN отлично работает как на телефоне, так и на ПК.' \
+                   '\n\nПогнали!' \
+                   '\n\n<b>Поддержка</b> @voxwork' \
+                   '\n<b>Новостной канал</b> @voxglobal' \
+                   '\nС уважением,' \
+                   '\nКоманда VOX VPN ⚡️'
+            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu())
 
         # Отвечаем на callback
-        await callback.answer(f"Вы выбрали: {action}")
+        # await callback.answer(f"Вы выбрали: {action}")
 
     except Exception as e:
         logger.error(f"Ошибка при обработке нажатия кнопки: {e}")
@@ -254,12 +269,12 @@ async def device_connect(callback: CallbackQuery):
         # Добавьте другие устройства здесь
     }
     urls = DEVICE_URLS[device]
-    text = f"Подлючкение к VPN для {urls['device']}" \
+    text = f"Подлючкение к VOX VPN для {urls['device']}" \
            "\nВам нужно сделать всего 2 шага:" \
-           "\n\n1️⃣Скачайте и установите приложение перейдя по кнопке" \
-           "\n🌐Скачать приложение 👇" \
-           "\n\n2️⃣Нажимите на кнопку" \
-           "\n🚀Подлючиться 👇"
+           "\n\n1. Скачайте и установите приложение перейдя по кнопке" \
+           "\n\n2. Нажимите на кнопку «ПОДКЛЮЧИТЬСЯ»" \
+           "\n\n🚨 <b>Бесплатный период действует 3 дня!</b>" \
+           "\n\nПосле истечения срока, вы можете оплатить на месяц и VPN в приложении автоматически продлится и продолжит работать."
 
 
     await handle_message_edit(callback, text, user_keyboards.get_device_kb(urls["download_url"], urls["connect_url"] ))
