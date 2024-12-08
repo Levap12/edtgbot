@@ -22,7 +22,7 @@ TOKEN_TG = os.getenv("TOKEN_TG")
 bot = Bot(token=TOKEN_TG)
 
 
-@app.get("/sub/{user_id}")
+@app.get("/subs/{user_id}")
 async def redirect_user(user_id):
     try:
         logging.info(f"Received user_id: {user_id}")
