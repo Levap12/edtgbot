@@ -113,7 +113,7 @@ async def handle_button_click(callback: types.CallbackQuery):
                    '\n\nПогнали!' \
                    '\n\n<b>Поддержка</b> @voxwork' \
                    '\n<b>Новостной канал</b> @voxglobal' \
-                   '\nС уважением,' \
+                   '\n\nС уважением,' \
                    '\nКоманда VOX VPN ⚡️'
             await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
 
