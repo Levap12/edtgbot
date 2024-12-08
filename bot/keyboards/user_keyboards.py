@@ -3,11 +3,13 @@ from typing import List, Dict
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-def get_first_start_kb() -> InlineKeyboardMarkup:
+def main_menu() -> InlineKeyboardMarkup:
     # Главгвное меню
 
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='🔌 Подключиться', callback_data='chose_device')]
+        [InlineKeyboardButton(text='КУПИТЬ VPN', callback_data='buyvpn')],
+        [InlineKeyboardButton(text='ПОЛУЧИТЬ БЕСПЛАТНО', callback_data='chose_device')],
+        [InlineKeyboardButton(text='ПОМОЩЬ', url='https://t.me/nyrpeisov')]
     ])
     return ikb
 
@@ -64,17 +66,16 @@ def get_buyvpn_kb() -> InlineKeyboardMarkup:
     # Купить ВПН меню
 
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='1 месяц', callback_data='buyvpn_1')],
-         [InlineKeyboardButton(text='3 месяца', callback_data='buyvpn_3')],
-         [InlineKeyboardButton(text='6 месяцев', callback_data='buyvpn_6')],
-        [InlineKeyboardButton(text='Назад', callback_data='back_to_menu')]
+        [InlineKeyboardButton(text='1 МЕСЯЦ - 200 РУБЛЕЙ', callback_data='buyvpn_1')],
+         [InlineKeyboardButton(text='3 МЕСЯЦА - 600 РУБЛЕЙ', callback_data='buyvpn_3')],
+         [InlineKeyboardButton(text='6 МЕСЯЦЕВ - 900 РУБЛЕЙ', callback_data='buyvpn_6')],
     ])
 
     return ikb
 
-def get_payment_kb(months: int, payment_url: str, crypto_payment_url: str) -> InlineKeyboardMarkup:
+def get_payment_kb(payment_url: str, crypto_payment_url: str) -> InlineKeyboardMarkup:
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='✍ Написать', url=payment_url)],
+        [InlineKeyboardButton(text='Оплатить', url=payment_url)],
         [InlineKeyboardButton(text='Назад', callback_data='back_to_menu')]
     ])
     return ikb

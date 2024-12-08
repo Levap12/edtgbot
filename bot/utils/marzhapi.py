@@ -1,7 +1,4 @@
 import asyncio
-
-from aiocache import cached
-from marzpy import Marzban
 from marzpy.api.user import User
 from datetime import datetime, timedelta
 from aiohttp.client_exceptions import ClientResponseError,ClientError, InvalidURL
@@ -9,7 +6,8 @@ from dotenv import load_dotenv
 import os
 from dateutil.relativedelta import relativedelta
 import logging
-
+import aiohttp
+import json
 
 load_dotenv('../.env')
 LOGIN = os.getenv("MARZH_LOGIN")
@@ -19,16 +17,49 @@ PANEL_URL = os.getenv("PANEL_URL")
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-@cached(ttl=600)
+# @cached(ttl=600)
 async def get_panel_and_token():
-    panel = Marzban(LOGIN, PASS, PANEL_URL)
+    logging.debug(f"LOGIN, PASS, PANEL_URL: {LOGIN},{PASS},{PANEL_URL}")
+
+    url = f"{PANEL_URL}/api/admin/token"  # URL для авторизации, если он отличается, нужно изменить
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    # Данные для авторизации
+    payload = {
+        "username": LOGIN,
+        "password": PASS
+    }
+
     try:
-        token = await panel.get_token()
-        logging.debug(f"Token received: {token}")
-        return panel, token
-    except (ClientError, InvalidURL) as ex:
-        logging.error(f"Failed to get token: {ex}")
-        raise Exception(f"Failed to get token: {ex}")
+        async with aiohttp.ClientSession() as session:
+            # Отправка POST-запроса для получения токена
+            async with session.post(url, data=payload, headers=headers) as response:
+                # Проверка статуса ответа
+                if response.status == 200:
+                    result = await response.json()  # Получаем ответ в формате JSON
+                    access_token = result.get('access_token')
+                    if access_token:
+                        logging.debug(f"Token received: {access_token}")
+                        return access_token
+                    else:
+                        logging.error(f"Access token not found in response: {result}")
+                        raise Exception("Failed to obtain access token from response.")
+                elif response.status == 422:
+                    error_detail = await response.json()
+                    logging.error(f"Validation Error: {error_detail}")
+                    raise Exception(f"Validation Error: {error_detail}")
+                else:
+                    error_message = await response.text()
+                    logging.error(
+                        f"Failed to get token. Status code: {response.status}. Error details: {error_message}")
+                    raise Exception(
+                        f"Failed to get token. Status code: {response.status}. Error details: {error_message}")
+
+    except Exception as e:
+        logging.error(f"Error during token request: {str(e)}")
+        raise Exception(f"Error during token request: {str(e)}")
 
 
 async def get_user_sub(user_id: int):
@@ -95,54 +126,98 @@ async def crate_user(user_id: int):
     logger.debug(f"crate_user called with user_id={user_id}")
 
     try:
-        panel, token = await get_panel_and_token()
+        # Получаем токен для авторизации
+        token = await get_panel_and_token()
         logger.debug("Got panel and token")
 
+        # Устанавливаем время истечения срока действия аккаунта через 3 дня
         expire_time = datetime.utcnow() + timedelta(days=3)  # Установка времени истечения срока действия на 3 дня
         expire_timestamp = int(expire_time.timestamp())
-        user = User(
-            username=str(user_id),  # Задайте уникальное имя пользователя
-            proxies={
-                "vless": {}
-            },
-            inbounds={"vless": ["VLESS TCP REALITY"]},  # Установка входящих соединений для Shadowsocks
-            expire=expire_timestamp,  # Установка времени истечения срока действия
-            data_limit=1024*1024*1024*25,  # Установка лимита данных, если необходимо
-            data_limit_reset_strategy="no_reset",  # Стратегия сброса лимита данных
-            status="active"  # Статус пользователя
-        )
-        logger.debug(f"Created user object: {user}")
 
-        result = await panel.add_user(user=user, token=token)
-        logger.info(f"User added successfully: {result.links[0]}")
-        # print(result.links[0])
-        return {
-            "status": "ok",
-            "data": {
-                "link": result.links[0]
-            }
+        # Формируем данные для нового пользователя
+        user_data = {
+            "username": str(user_id),  # Имя пользователя
+            "proxies": {
+                "vless": {}  # Пример настройки прокси
+            },
+            "inbounds": {
+                "vless": ["VLESS TCP REALITY"]  # Входящие соединения для vless
+            },
+            "expire": expire_timestamp,  # Время истечения срока
+            "data_limit": 1024 * 1024 * 1024 * 25,  # Лимит данных (в байтах)
+            "data_limit_reset_strategy": "no_reset",  # Стратегия сброса лимита
+            "status": "active",  # Статус пользователя
+            "note": "",  # Дополнительная информация (по желанию)
+            "on_hold_timeout": "2023-11-03T20:30:00",  # Время начала статуса on_hold
+            "on_hold_expire_duration": 0  # Длительность статуса on_hold (0 - без ограничений)
         }
+
+        logger.debug(f"User data to be sent: {json.dumps(user_data, indent=2)}")
+
+        # Заголовки запроса
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        # URL для создания пользователя
+        url = f"{PANEL_URL}/api/user"
+
+        # Выполнение запроса с использованием aiohttp
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(url, json=user_data, headers=headers) as response:
+                    # Проверка статуса ответа
+                    if response.status == 200:
+                        result = await response.json()
+                        logger.info(f"User added successfully: {result['links'][0]}")
+                        # Возвращаем успешный результат
+                        return {
+                            "status": "ok",
+                            "data": {
+                                "link": result['links'][0]
+                            }
+                        }
+                    else:
+                        # Логирование ошибки, если статус не 200
+                        logger.error(f"Failed to create user. Status code: {response.status}")
+                        error_message = await response.text()
+                        logger.error(f"Error details: {error_message}")
+                        return {
+                            "status": "error",
+                            "message": f"Failed to create user. Status code: {response.status}, {error_message}"
+                        }
+
+            except Exception as e:
+                # Логирование ошибок при выполнении запроса
+                logger.error(f"Error while making the request: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": f"Request error: {str(e)}"
+                }
+
     except ClientResponseError as e:
+        # Обработка ошибки, если пользователь уже существует
         logger.error(f"ClientResponseError occurred: {e}", exc_info=True)
         if e.status == 409:
-            logger.debug("User already exists, fetching existing user data")
-            result = await panel.get_user(str(user_id), token=token)
-            logger.debug(f"Fetched existing user data: {result.subscription_url}")
-            # print(result.subscription_url)
+            logger.debug("User already exists")
+            # Если пользователь существует, просто возвращаем статус "exists"
             return {
                 "status": "exists",
-                "data": {
-                    "link": f"{PANEL_URL}{result.subscription_url}"
-                }
+                "message": "User already exists."
             }
         else:
+            # Обработка других ошибок ClientResponseError
             return {
                 "status": "error",
                 "message": f"ClientResponseError: {str(e)}"
             }
+
     except Exception as e:
+        # Логирование других неожиданных ошибок
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-        raise
+        raise  # Перебрасываем исключение, если оно не обработано
+
 
 
 async def get_user_info(user_id):

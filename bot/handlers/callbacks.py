@@ -1,16 +1,22 @@
-from aiogram import F, Router, types
-from aiogram.types import Message, CallbackQuery
+from aiogram import F, Router, types, Bot
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from bot.keyboards import user_keyboards
+from aiogram.filters import CommandStart
 import os
 from bot.utils import marzhapi
 import asyncio
 callback_router = Router()
 from bot.utils.base64coding import encode
 from dotenv import load_dotenv
-from bot.utils.payment import create_payment
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv('../.env')
 SUB_URL = os.getenv("SUB_URL")
+TOKEN = os.getenv("TOKEN_TG")
+bot = Bot(token=TOKEN)
 
 # @callback_router.callback_query(F.data == 'first_connect')
 # async def first_connect(callback: CallbackQuery):
@@ -43,55 +49,116 @@ async def handle_message_edit(callback: CallbackQuery, new_text: str, new_reply_
         await callback.answer("Сообщение не изменено.")
 
 
-@callback_router.callback_query(F.data == 'profile')
-async def profile_cb(callback: CallbackQuery):
-    user_info = await marzhapi.get_user_info(callback.from_user.id)
+# Обработчик команды /start
+@callback_router.message(CommandStart())
+async def cmd_start(message: types.Message):
+    try:
+        # Путь к изображению (file_id)
+        image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
 
-    if user_info["subscription_status"] == 'active':
-        sub_status = "✅ Активна"
-    elif user_info["subscription_status"] == 'disabled' or 'expired':
-        sub_status = "❌ Не активна"
+        # Логирование параметров
+        logger.info(f"Команда /start: отправляем изображение {image_path} с клавиатурой.")
 
-    else:
-        sub_status = "❓ Неизветсна ошибка"
+        create_user_result = await marzhapi.crate_user(message.from_user.id)  # создание пользователя в панеле VPN
+        if create_user_result['status'] == 'ok':
+            # Если пользователь успешно создан, отправляем уведомление в группу
+            group_message = (
+                f'🆕 Новый пользователь подключился!\n'
+                f'Имя: {message.from_user.first_name}\n'
+                f'ID пользователя: {message.from_user.id}\n'
+                f'Username: @{message.from_user.username}'
+            )
+            await bot.send_message(chat_id=-1002286289168, text=group_message)
 
-    text = f'<b>Подписка: {sub_status}</b>\n' \
-           f'├ ID: {callback.from_user.id}\n' \
-           f'├ Осталось дней: {user_info["remaining_days"]}\n' \
-           f'└ Активна до: {user_info["expire_date"]}'#├└
-
-    await handle_message_edit(callback, text, user_keyboards.get_profile_kb())
-
-
-@callback_router.callback_query(F.data == 'back_to_menu')
-async def back_to_main_cb(callback: CallbackQuery):
-    main_menu = 'Nock VPN — безопасная защита для вашей онлайн-жизни.\n' \
-                '\n' \
-                '🔥 Приобретайте подписку Nock VPN от 190₽\n' \
-                '\n' \
-                '⚡️ Подключайтесь к VPN, жмите на кнопку «Подключится»\n' \
-                '\n' \
-                'Вы можете управлять ботом следующими командами:'
-
-    await handle_message_edit(callback, main_menu, user_keyboards.get_main_kb())
+        # Отправляем сообщение с картинкой и клавиатурой
+        await message.answer_photo(photo=image_path, reply_markup=user_keyboards.main_menu())
+    except Exception as e:
+        logger.error(f"Ошибка в обработчике /start: {e}")
+        await message.answer("Произошла ошибка при обработке команды /start.")
 
 
-@callback_router.callback_query(F.data == 'buyvpn')
-async def buyvpn_cb(callback: CallbackQuery):
-    text = 'Для полного доступа выберите удобный для вас тариф:' \
-           '\n\n190₽ / 1 мес' \
-           '\n500₽ / 3 мес' \
-           '\n900₽ / 6 мес' \
-           '\n\n💳 К оплате принимаются карты РФ:' \
-           '\nVisa, MasterCard, МИР и криптовалюты.'
+# Обработчик нажатий на кнопки
+@callback_router.callback_query(F.data.in_(['buyvpn', 'chose_device','back_to_menu']))
+async def handle_button_click(callback: types.CallbackQuery):
+    try:
+        action = callback.data
+        logger.info(f"Пользователь выбрал действие: {action}")
+
+        # Удаляем старое сообщение
+        await callback.message.delete()
+
+        # Логируем, какое сообщение и клавиатуру мы отправляем
+        if action == 'buyvpn':
+            image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
+            logger.info(f"Отправляем изображение {image_path} с клавиатурой для покупки VPN.")
+            await callback.message.answer_photo(photo=image_path, reply_markup=user_keyboards.get_buyvpn_kb())
+        elif action == 'chose_device':
+            logger.info(f"Отправляем сообщение для получения бесплатного VPN.")
+
+            text = f'{callback.from_user.first_name}, выберите тип вашего устройства ниже 👇 чтобы увидеть инструкцию по подключению'
+            await callback.message.answer(text=text, reply_markup=user_keyboards.get_chose_device_kb())
+        elif action == 'back_to_menu':
+            image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
+            logger.info(f"Отправляем сообщение для получения меню.")
+            await callback.message.answer_photo(photo=image_path, reply_markup=user_keyboards.main_menu())
+
+        # Отвечаем на callback
+        await callback.answer(f"Вы выбрали: {action}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при обработке нажатия кнопки: {e}")
+        await callback.answer("Произошла ошибка при обработке вашего запроса.")
+
+# @callback_router.callback_query(F.data == 'profile')
+# async def profile_cb(callback: CallbackQuery):
+#     user_info = await marzhapi.get_user_info(callback.from_user.id)
+#
+#     if user_info["subscription_status"] == 'active':
+#         sub_status = "✅ Активна"
+#     elif user_info["subscription_status"] == 'disabled' or 'expired':
+#         sub_status = "❌ Не активна"
+#
+#     else:
+#         sub_status = "❓ Неизветсна ошибка"
+#
+#     text = f'<b>Подписка: {sub_status}</b>\n' \
+#            f'├ ID: {callback.from_user.id}\n' \
+#            f'├ Осталось дней: {user_info["remaining_days"]}\n' \
+#            f'└ Активна до: {user_info["expire_date"]}'#├└
+#
+#     await handle_message_edit(callback, text, user_keyboards.get_profile_kb())
 
 
-    await handle_message_edit(callback, text, user_keyboards.get_buyvpn_kb())
+# @callback_router.callback_query(F.data == 'back_to_menu')
+# async def back_to_main_cb(callback: CallbackQuery):
+#     main_menu = 'Nock VPN — безопасная защита для вашей онлайн-жизни.\n' \
+#                 '\n' \
+#                 '🔥 Приобретайте подписку Nock VPN от 190₽\n' \
+#                 '\n' \
+#                 '⚡️ Подключайтесь к VPN, жмите на кнопку «Подключится»\n' \
+#                 '\n' \
+#                 'Вы можете управлять ботом следующими командами:'
+#
+#     await handle_message_edit(callback, main_menu, user_keyboards.get_main_kb())
 
+
+# @callback_router.callback_query(F.data == 'buyvpn')
+# async def buyvpn_cb(callback: CallbackQuery):
+#     text = 'Для полного доступа выберите удобный для вас тариф:' \
+#            '\n\n190₽ / 1 мес' \
+#            '\n500₽ / 3 мес' \
+#            '\n900₽ / 6 мес' \
+#            '\n\n💳 К оплате принимаются карты РФ:' \
+#            '\nVisa, MasterCard, МИР и криптовалюты.'
+#
+#
+#     await handle_message_edit(callback, text, user_keyboards.get_buyvpn_kb())
+#
 
 async def handle_subscription(callback: CallbackQuery, months: int):
     user_id = callback.from_user.id
-
+    await callback.message.delete()
+    logger.info(f"Функция handle_subscription")
     if months == 1:
         month_text = "месяц"
     elif 2 <= months <= 4:
@@ -99,11 +166,13 @@ async def handle_subscription(callback: CallbackQuery, months: int):
     else:
         month_text = "месяцев"
 
-    text = f'ℹ️ Доступ на {months} {month_text}. ' \
-           f'Оплата переводом на Т-Банк' \
-           f'\n\n❗️Для оплаты напишите оператору 👇'
-    payment_link = "https://t.me/NockVPN_support"
-    await handle_message_edit(callback, text, user_keyboards.get_payment_kb(months, payment_link, None))
+    text = f'ℹ️ Доступ на {months} {month_text}.'
+    payment_link = "https://t.me/nyrpeisov"
+    await callback.message.answer(text=text, reply_markup=user_keyboards.get_payment_kb(payment_link, None))
+
+
+
+    # await handle_message_edit(callback, text, user_keyboards.get_payment_kb(months, payment_link, None))
     # payment_link, error = await create_payment(user_id, months)
     # if payment_link:
     #     text = f'Доступ на {months} {month_text}'
@@ -151,10 +220,10 @@ async def trial_shadowsocks_cb(callback: CallbackQuery):
            'Рекомендуем Vless'
     await handle_message_edit(callback, text, user_keyboards.get_connect_kb())
 
-@callback_router.callback_query(F.data == 'chose_device')
-async def chose_device(callback: CallbackQuery):
-    text = f'{callback.from_user.first_name}, выберите тип вашего устройства ниже 👇 чтобы увидеть инструкцию по подключению'
-    await handle_message_edit(callback, text, user_keyboards.get_chose_device_kb())
+# @callback_router.callback_query(F.data == 'chose_device')
+# async def chose_device(callback: CallbackQuery):
+#     text = f'{callback.from_user.first_name}, выберите тип вашего устройства ниже 👇 чтобы увидеть инструкцию по подключению'
+#     await handle_message_edit(callback, text, user_keyboards.get_chose_device_kb())
 
 @callback_router.callback_query(F.data.startswith('device_'))
 async def device_connect(callback: CallbackQuery):
