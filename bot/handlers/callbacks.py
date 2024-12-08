@@ -115,7 +115,7 @@ async def handle_button_click(callback: types.CallbackQuery):
                    '\n<b>Новостной канал</b> @voxglobal' \
                    '\nС уважением,' \
                    '\nКоманда VOX VPN ⚡️'
-            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu())
+            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
 
         # Отвечаем на callback
         # await callback.answer(f"Вы выбрали: {action}")
