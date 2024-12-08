@@ -75,7 +75,7 @@ async def cmd_start(message: types.Message):
                '\n\nПогнали!' \
                '\n\n<b>Поддержка</b> @voxwork' \
                '\n<b>Новостной канал</b> @voxglobal' \
-               '\nС уважением,' \
+               '\n\nС уважением,' \
                '\nКоманда VOX VPN ⚡️'
         # Отправляем сообщение с картинкой и клавиатурой
         await message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
