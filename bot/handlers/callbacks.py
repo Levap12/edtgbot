@@ -92,7 +92,10 @@ async def handle_button_click(callback: types.CallbackQuery):
         logger.info(f"Пользователь выбрал действие: {action}")
 
         # Удаляем старое сообщение
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except Exception as e:
+            logger.error(f"Не удалось удалить сообщение: {e}")
 
         # Логируем, какое сообщение и клавиатуру мы отправляем
         if action == 'buyvpn':
@@ -172,7 +175,11 @@ async def handle_button_click(callback: types.CallbackQuery):
 
 async def handle_subscription(callback: CallbackQuery, months: int):
     user_id = callback.from_user.id
-    await callback.message.delete()
+    try:
+        await callback.message.delete()
+    except Exception as e:
+        logger.error(f"Не удалось удалить сообщение: {e}")
+
     logger.info(f"Функция handle_subscription")
     if months == 1:
         month_text = "месяц"
