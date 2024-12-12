@@ -105,6 +105,52 @@ async def get_user_sub(user_id: int):
         raise Exception(f"Error during user subscription request: {str(e)}")
 
 
+async def get_user_vless_link(user_id: int):
+    logging.debug(f"Getting VLESS link for user_id: {user_id}")
+
+    # Получаем токен для авторизации
+    token = await get_panel_and_token()
+
+    # Формируем URL для запроса информации о пользователе
+    url = f"{PANEL_URL}/api/user/{user_id}"
+
+    # Заголовки запроса с авторизацией
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Выполняем GET-запрос для получения данных о пользователе
+            async with session.get(url, headers=headers) as response:
+                # Проверяем успешность запроса
+                if response.status == 200:
+                    result = await response.json()  # Получаем ответ в формате JSON
+                    logging.debug(f"User VLESS link: {result.get('links', ['No link found'])[0]}")
+
+                    # Возвращаем первую ссылку из поля "links"
+                    if result.get('links'):
+                        return result['links'][0]
+                    else:
+                        raise Exception("No VLESS link found in the response.")
+                elif response.status == 422:
+                    # Обрабатываем ошибку валидации
+                    error_detail = await response.json()
+                    logging.error(f"Validation Error: {error_detail}")
+                    raise Exception(f"Validation Error: {error_detail}")
+                else:
+                    # Логируем ошибку, если статус не 200
+                    error_message = await response.text()
+                    logging.error(
+                        f"Failed to get user VLESS link. Status code: {response.status}. Error details: {error_message}")
+                    raise Exception(
+                        f"Failed to get user VLESS link. Status code: {response.status}. Error details: {error_message}")
+    except Exception as e:
+        logging.error(f"Error during user VLESS link request: {str(e)}")
+        raise Exception(f"Error during user VLESS link request: {str(e)}")
+
+
 async def extend_expire(user_id: int, months: int):
     logger.debug(f"extend_expire called with user_id={user_id}, months={months}")
 
