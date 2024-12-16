@@ -189,7 +189,7 @@ async def handle_subscription(callback: CallbackQuery, months: int):
         month_text = "месяцев"
 
     text = f'ℹ️ Доступ на {months} {month_text}.'
-    payment_link = "https://t.me/nyrpeisov"
+    payment_link = "https://t.me/voxwork"
     await callback.message.answer(text=text, reply_markup=user_keyboards.get_payment_kb(payment_link, None))
 
 
