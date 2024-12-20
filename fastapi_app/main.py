@@ -25,6 +25,7 @@ TOKEN_TG = os.getenv("TOKEN_TG")
 bot = Bot(token=TOKEN_TG)
 SECRET_KEY = os.getenv("SECRET_KEY")
 
+processed_payments = set()
 
 @app.get("/subs/{user_id}")
 async def redirect_user(user_id):
@@ -95,6 +96,14 @@ async def payment_notification(request: Request):
 
     # Process the payment notification
     try:
+        operation_id = data.get("operation_id", [None])[0]
+        if operation_id in processed_payments:
+            logging.info(f"Duplicate payment notification detected for operation_id: {operation_id}")
+            return {"status": "duplicate"}
+
+        # Mark payment as processed
+        processed_payments.add(operation_id)
+
         label = data.get("label", [None])[0]
         if label:
             try:
@@ -104,7 +113,6 @@ async def payment_notification(request: Request):
                 mounth = label_data.get("mounth")
                 logging.info(f"Payment received for user_id: {user_id}, month: {mounth}")
                 await extend_expire(int(user_id), int(mounth))
-                await bot.send_message(user_id, f"Подписка обновлена на {mounth} мес.")
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid label format: {e}")
                 raise HTTPException(status_code=400, detail="Invalid label format")
