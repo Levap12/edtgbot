@@ -64,7 +64,7 @@ async def payment_notification(request: Request):
     # Read and parse the request body
     try:
         body = await request.body()
-        logging.info("Request body successfully read")
+        logging.info(f"Request body successfully read {body}")
     except Exception as e:
         logging.error(f"Error reading request body: {e}")
         raise HTTPException(status_code=500, detail="Failed to read request body")
