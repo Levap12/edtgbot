@@ -154,53 +154,75 @@ async def get_user_vless_link(user_id: int):
 async def extend_expire(user_id: int, months: int):
     logger.debug(f"extend_expire called with user_id={user_id}, months={months}")
 
+    # Получаем токен для авторизации
+    token = await get_panel_and_token()
+
+    # Формируем URL для обновления информации о пользователе
+    url = f"{PANEL_URL}/api/user/{user_id}"
+
+    # Заголовки запроса с авторизацией
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
     try:
-        panel, token = await get_panel_and_token()
-        logger.debug(f"Got panel and token: panel={panel}, token={token}")
+        async with aiohttp.ClientSession() as session:
+            # Сначала получаем текущие данные пользователя
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    user_data = await response.json()
+                    logger.debug(f"Got user data: {user_data}")
 
-        # Получить текущие данные пользователя
-        user_data = await panel.get_user(str(user_id), token=token)
-        logger.debug(f"Got user data: {user_data}")
+                    # Проверяем текущий срок действия подписки
+                    current_expire_timestamp = user_data.get("expire")
+                    if current_expire_timestamp is None:
+                        current_expire_time = datetime.utcnow()
+                    else:
+                        current_expire_time = datetime.utcfromtimestamp(current_expire_timestamp)
+                    now = datetime.utcnow()
 
-        # Проверить текущий срок действия подписки
-        current_expire_timestamp = user_data.expire
-        if current_expire_timestamp is None:
-            current_expire_time = datetime.utcnow()
-        else:
-            current_expire_time = datetime.utcfromtimestamp(current_expire_timestamp)
-        now = datetime.utcnow()
+                    logger.debug(f"Current expire time: {current_expire_time}, now: {now}")
 
-        logger.debug(f"Current expire time: {current_expire_time}, now: {now}")
+                    # Определяем новую дату истечения срока действия
+                    if current_expire_time < now:
+                        # Если срок действия истек, прибавляем месяцы от текущей даты
+                        new_expire_time = now + relativedelta(months=months)
+                    else:
+                        # Если срок действия еще активен, прибавляем месяцы от текущего срока действия
+                        new_expire_time = current_expire_time + relativedelta(months=months)
 
-        # Определить новую дату истечения срока действия
-        if current_expire_time < now:
-            # Если срок действия истек, прибавить месяцы от сегодняшнего дня
-            new_expire_time = now + relativedelta(months=months)
-        else:
-            # Если срок действия еще активен, прибавить месяцы от текущего срока действия
-            new_expire_time = current_expire_time + relativedelta(months=months)
+                    new_expire_timestamp = int(new_expire_time.timestamp())
+                    logger.debug(f"New expire time: {new_expire_time} (timestamp: {new_expire_timestamp})")
 
-        user_data.status = 'active'
-        user_data.data_limit = 0
+                    # Подготавливаем данные для обновления пользователя
+                    update_payload = {
+                        "expire": new_expire_timestamp,
+                        "status": "active",
+                        "data_limit": 0,
+                        "username": user_data.get("username"),
+                        "proxies": user_data.get("proxies"),
+                        "inbounds": user_data.get("inbounds"),
+                    }
 
-        new_expire_timestamp = int(new_expire_time.timestamp())
-        logger.debug(f"New expire time: {new_expire_time} (timestamp: {new_expire_timestamp})")
+                    # Отправляем запрос на обновление
+                    async with session.put(url, headers=headers, json=update_payload) as update_response:
+                        if update_response.status == 200:
+                            result = await update_response.json()
+                            logger.debug(f"User modified successfully: {result}")
+                            return result
+                        else:
+                            error_message = await update_response.text()
+                            logger.error(f"Failed to modify user. Status code: {update_response.status}. Error details: {error_message}")
+                            raise Exception(f"Failed to modify user. Status code: {update_response.status}. Error details: {error_message}")
+                else:
+                    error_message = await response.text()
+                    logger.error(f"Failed to get user data. Status code: {response.status}. Error details: {error_message}")
+                    raise Exception(f"Failed to get user data. Status code: {response.status}. Error details: {error_message}")
 
-        user = User(
-            username=user_data.username,  # Используйте текущее имя пользователя
-            proxies=user_data.proxies,  # Используйте текущие прокси данные
-            inbounds=user_data.inbounds,  # Используйте текущие входящие соединения
-            expire=new_expire_timestamp,  # Установить новую дату истечения срока действия
-            data_limit=user_data.data_limit,  # Используйте текущий лимит данных
-            status=user_data.status  # Используйте текущий статус пользователя
-        )
-
-        result = await panel.modify_user(str(user_id), token=token, user=user)
-        logger.debug(f"User modified successfully: {result}")
-        return result
     except Exception as e:
-        logger.error(f"Error in extend_expire: {e}", exc_info=True)
-        raise
+        logger.error(f"Error in extend_expire: {str(e)}", exc_info=True)
+        raise Exception(f"Error in extend_expire: {str(e)}")
 
 
 async def crate_user(user_id: int):
@@ -343,6 +365,19 @@ async def get_user_info(user_id):
         logger.error(f"Error in get_user_info: {e}", exc_info=True)
         raise
 
+# async def main():
+#     user_id = 452398375  # Replace with the actual user ID
+#     months_to_extend = 3  # Replace with the desired number of months
+#
+#     try:
+#         result = await extend_expire(user_id, months_to_extend)
+#         print(f"Subscription extended successfully: {result}")
+#     except Exception as e:
+#         print(f"An error occurred: {e}")
+#
+# if __name__ == "__main__":
+#     logging.basicConfig(level=logging.DEBUG)
+#     asyncio.run(main())
 
 # async def main():
 #     result = await extend_expire("452398375",1)

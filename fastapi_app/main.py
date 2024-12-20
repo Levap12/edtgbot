@@ -4,6 +4,8 @@ from fastapi.responses import RedirectResponse
 from aiogram import Bot
 from dotenv import load_dotenv
 import os
+import hmac
+import hashlib
 
 from bot.utils.base64coding import decode
 from bot.utils.marzhapi import get_user_sub
@@ -20,6 +22,7 @@ app = FastAPI()
 load_dotenv('../.env')
 TOKEN_TG = os.getenv("TOKEN_TG")
 bot = Bot(token=TOKEN_TG)
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 
 @app.get("/subs/{user_id}")
@@ -54,43 +57,68 @@ async def payment(request: Request):
     return {"link": link}
 # ae00-178-90-225-38.ngrok-free.app/payment?user_id=1546789&mounts=1
 
+@app.post("/payment_notification")
+async def payment_notification(request: Request):
+    logging.info("Received payment notification request")
 
-@app.get("/payment/callback")
-async def payment_notify(request: Request):
-    params = request.query_params
-    unique_id = params.get('unique_id')
-    sign = params.get('sign')
-    amount = params.get('amount')
-    status = params.get('status')
-    additional = params.get('additional')
+    # Read and parse the request body
+    try:
+        body = await request.body()
+        logging.info("Request body successfully read")
+    except Exception as e:
+        logging.error(f"Error reading request body: {e}")
+        raise HTTPException(status_code=500, detail="Failed to read request body")
 
-    logging.info(f"== unique_id: {unique_id}, sign: {sign}, amount: {amount}, status: {status}, additional: {additional}")
+    # Verify the notification signature
+    signature = request.headers.get("sha1-hash")
+    if not signature:
+        logging.warning("Missing signature header")
+        raise HTTPException(status_code=400, detail="Missing signature header")
 
-    # Проверка корректности подписи
-    if not await verify_sign(unique_id, amount, sign):
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    # Compute the HMAC hash using the secret key
+    computed_signature = hmac.new(
+        SECRET_KEY.encode('utf-8'),
+        body,
+        hashlib.sha1
+    ).hexdigest()
 
-    # Обработка дополнительной информации
-    if additional:
-        try:
-            additional_data = json.loads(additional)
-            user_id = additional_data.get('user_id')
-            months = additional_data.get('months')
-            if user_id and months:
-                await extend_expire(user_id, months)
-                try:
-                    await bot.send_message(user_id, "Поздравляем вы обладатель подписки NockVPN ")
-                    logger.info(f"Message sent to chat_id={user_id}")
-                except Exception as e:
-                    logger.error(f"Failed to send message: {e}", exc_info=True)
-            else:
-                logging.error(f"Invalid additional data: {additional}")
-                raise HTTPException(status_code=400, detail="Invalid additional data")
-        except json.JSONDecodeError:
-            logging.error(f"Invalid JSON format for additional: {additional}")
-            raise HTTPException(status_code=400, detail="Invalid JSON format for additional")
+    if signature != computed_signature:
+        logging.warning("Invalid signature detected")
+        raise HTTPException(status_code=403, detail="Invalid signature")
 
-    return {"message": "Payment processed successfully"}
+    logging.info("Signature verification successful")
+
+    # Process the payment notification
+    try:
+        notification_data = await request.json()
+        logging.info(f"Notification data: {notification_data}")
+    except Exception as e:
+        logging.error(f"Error parsing JSON: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON format")
+
+    # Example: Check payment status and log or process it
+    if notification_data.get("unaccepted") == False:
+        label = notification_data.get("label")
+        if label:
+            try:
+                label_data = json.loads(label)
+                logging.info(f"Label data: {label_data}")
+                user_id = label_data.get("user_id")
+                mounth = label_data.get("mounth")
+                logging.info(f"Payment received for user_id: {user_id}, month: {mounth}")
+                extend_expire(int(user_id),int(mounth))
+                # Add your payment processing logic here
+            except json.JSONDecodeError as e:
+                logging.error(f"Invalid label format: {e}")
+                raise HTTPException(status_code=400, detail="Invalid label format")
+        else:
+            logging.warning("Missing label in notification data")
+            raise HTTPException(status_code=400, detail="Missing label in notification data")
+    else:
+        logging.info("Payment not accepted.")
+
+    logging.info("Payment notification processed successfully")
+    return {"status": "success"}
 
 
 async def get_redis_connection():
