@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 import hmac
 import hashlib
+from urllib.parse import parse_qs
 
 from bot.utils.base64coding import decode
 from bot.utils.marzhapi import get_user_sub
@@ -65,40 +66,36 @@ async def payment_notification(request: Request):
     try:
         body = await request.body()
         logging.info(f"Request body successfully read {body}")
+        data = parse_qs(body.decode("utf-8"))
+        logging.info(f"Parsed data: {data}")
     except Exception as e:
-        logging.error(f"Error reading request body: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read request body")
+        logging.error(f"Error reading or parsing request body: {e}")
+        raise HTTPException(status_code=400, detail="Failed to parse request body")
 
     # Verify the notification signature
-    # signature = request.headers.get("sha1-hash")
-    # if not signature:
-    #     logging.warning("Missing signature header")
-    #     raise HTTPException(status_code=400, detail="Missing signature header")
-    #
-    # # Compute the HMAC hash using the secret key
-    # computed_signature = hmac.new(
-    #     SECRET_KEY.encode('utf-8'),
-    #     body,
-    #     hashlib.sha1
-    # ).hexdigest()
-    #
-    # if signature != computed_signature:
-    #     logging.warning("Invalid signature detected")
-    #     raise HTTPException(status_code=403, detail="Invalid signature")
-    #
-    # logging.info("Signature verification successful")
+    received_signature = data.get("sha1_hash", [None])[0]
+    if not received_signature:
+        logging.warning("Missing sha1_hash in data")
+        raise HTTPException(status_code=400, detail="Missing sha1_hash")
+
+    # Compute the HMAC hash using the secret key
+    sorted_keys = sorted(key for key in data if key != "sha1_hash")
+    message = "&".join(f"{key}={data[key][0]}" for key in sorted_keys).encode("utf-8")
+    computed_signature = hmac.new(
+        SECRET_KEY.encode('utf-8'),
+        message,
+        hashlib.sha1
+    ).hexdigest()
+
+    if received_signature != computed_signature:
+        logging.warning("Invalid signature detected")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    logging.info("Signature verification successful")
 
     # Process the payment notification
     try:
-        notification_data = await request.json()
-        logging.info(f"Notification data: {notification_data}")
-    except Exception as e:
-        logging.error(f"Error parsing JSON: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
-
-    # Example: Check payment status and log or process it
-    if notification_data.get("unaccepted") == False:
-        label = notification_data.get("label")
+        label = data.get("label", [None])[0]
         if label:
             try:
                 label_data = json.loads(label)
@@ -106,16 +103,16 @@ async def payment_notification(request: Request):
                 user_id = label_data.get("user_id")
                 mounth = label_data.get("mounth")
                 logging.info(f"Payment received for user_id: {user_id}, month: {mounth}")
-                extend_expire(int(user_id),int(mounth))
-                # Add your payment processing logic here
+                extend_expire(int(user_id), int(mounth))
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid label format: {e}")
                 raise HTTPException(status_code=400, detail="Invalid label format")
         else:
             logging.warning("Missing label in notification data")
             raise HTTPException(status_code=400, detail="Missing label in notification data")
-    else:
-        logging.info("Payment not accepted.")
+    except Exception as e:
+        logging.error(f"Error processing payment data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process payment data")
 
     logging.info("Payment notification processed successfully")
     return {"status": "success"}
