@@ -15,9 +15,25 @@ from bot.utils.marzhapi import extend_expire
 import aioredis
 
 import json
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Путь к папке для логов
+log_dir = "logs"
+log_file = "payment_notifications.log"
+
+# Создаем папку для логов, если она не существует
+os.makedirs(log_dir, exist_ok=True)
+
+# Полный путь к файлу лога
+log_path = os.path.join(log_dir, log_file)
+
+# Настроим логирование
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Печать логов в консоль
+        logging.FileHandler(log_path, mode='a')  # Письмо логов в файл
+    ]
+)
 
 app = FastAPI()
 load_dotenv('../.env')

@@ -66,7 +66,7 @@ def get_buyvpn_kb() -> InlineKeyboardMarkup:
     # Купить ВПН меню
 
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        # [InlineKeyboardButton(text='TEST', callback_data='buyvpn_7')],
+        [InlineKeyboardButton(text='TEST', callback_data='buyvpn_7')],
         [InlineKeyboardButton(text='1 МЕСЯЦ - 200 РУБЛЕЙ', callback_data='buyvpn_1')],
          [InlineKeyboardButton(text='3 МЕСЯЦА - 600 РУБЛЕЙ', callback_data='buyvpn_3')],
          [InlineKeyboardButton(text='6 МЕСЯЦЕВ - 900 РУБЛЕЙ', callback_data='buyvpn_6')],
