@@ -129,6 +129,7 @@ async def payment_notification(request: Request):
                 mounth = label_data.get("mounth")
                 logging.info(f"Payment received for user_id: {user_id}, month: {mounth}")
                 await extend_expire(int(user_id), int(mounth))
+                await bot.send_message(user_id, f"Подписка обновлена на {mounth} мес.")
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid label format: {e}")
                 raise HTTPException(status_code=400, detail="Invalid label format")
