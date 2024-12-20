@@ -1,7 +1,6 @@
 from aiogram import Router,Dispatcher,F,Bot, types
 from bot.keyboards.user_keyboards import main_menu
 from aiogram.types import Message, FSInputFile
-from aiogram.filters import CommandStart
 from bot.utils import marzhapi
 from dotenv import load_dotenv
 import os

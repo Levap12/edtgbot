@@ -8,7 +8,7 @@ import asyncio
 callback_router = Router()
 from bot.utils.base64coding import encode
 from dotenv import load_dotenv
-
+from bot.utils.yoomonepay import create_payment
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -185,12 +185,15 @@ async def handle_subscription(callback: CallbackQuery, months: int):
         month_text = "месяц"
     elif 2 <= months <= 4:
         month_text = "месяца"
+    elif months == 7:
+        month_text = "месяца"
     else:
         month_text = "месяцев"
 
     text = f'ℹ️ Доступ на {months} {month_text}.'
-    payment_link = "https://t.me/voxwork"
-    await callback.message.answer(text=text, reply_markup=user_keyboards.get_payment_kb(payment_link, None))
+    transfer_url = "https://t.me/voxwork"
+    payment_link = await create_payment(user_id,months)
+    await callback.message.answer(text=text, reply_markup=user_keyboards.get_payment_kb(payment_link, transfer_url))
 
 
 
@@ -234,6 +237,9 @@ async def buyvpn_3_cb(callback: CallbackQuery):
 @callback_router.callback_query(F.data == 'buyvpn_6')
 async def buyvpn_6_cb(callback: CallbackQuery):
     await handle_subscription(callback, 6)
+@callback_router.callback_query(F.data == 'buyvpn_7')
+async def buyvpn_6_cb(callback: CallbackQuery):
+    await handle_subscription(callback, 7)
 
 
 @callback_router.callback_query(F.data == 'connect')
