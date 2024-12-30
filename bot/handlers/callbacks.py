@@ -1,7 +1,7 @@
 from aiogram import F, Router, types, Bot
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from bot.keyboards import user_keyboards
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 import os
 from bot.utils import marzhapi
 import asyncio
@@ -18,15 +18,6 @@ SUB_URL = os.getenv("SUB_URL")
 TOKEN = os.getenv("TOKEN_TG")
 bot = Bot(token=TOKEN)
 
-# @callback_router.callback_query(F.data == 'first_connect')
-# async def first_connect(callback: CallbackQuery):
-#     link = await marzhapi.crate_trial(callback.from_user.id)
-#     text = '🪐 Подключение к Vless:' \
-#            '\n' \
-#            f'\n<code>{link}</code>' \
-#            '\n👆 Нажмите чтобы скопировать!'
-#
-#     await callback.message.edit_text(text=text, reply_markup=user_keyboards.get_firstmsg_kb(), parse_mode='HTML')
 
 user_last_interaction = {}
 async def handle_message_edit(callback: CallbackQuery, new_text: str, new_reply_markup):
@@ -70,19 +61,40 @@ async def cmd_start(message: types.Message):
             )
             await bot.send_message(chat_id=-1002286289168, text=group_message)
         text = '<b>Добро пожаловать в VOX VPN!</b>' \
-               '\n\nМы гарантируем стабильность и высокую скорость!' \
-               '\n\nА главное – наш VPN отлично работает как на телефоне, так и на ПК.' \
-               '\n\nПогнали!' \
-               '\n\n<b>Поддержка</b> @voxwork' \
-               '\n<b>Новостной канал</b> @voxglobal' \
-               '\n\nС уважением,' \
-               '\nКоманда VOX VPN ⚡️'
+               '\n\nМы гарантируем <b>стабильное соединение</b> и <b>высокую скорость</b> для комфортного использования.' \
+               '\n\n<b>Один аккаунт — на всех устройствах:</b> VPN идеально работает как на <b>телефоне</b>, так и на <b>ПК.</b>' \
+               '\n\n<b>Погнали!</b>' \
+               '\n\n<b>🔹 Поддержка</b> @voxwork' \
+               '\n🔹 <b>Отзывы</b> @voxglobal' \
+               '\n🔸 <b>Профиль</b> /profile' \
+               '\n\n<b>С уважением,</b>' \
+               '\n<b>Команда VOX VPN</b> ⚡️'
         # Отправляем сообщение с картинкой и клавиатурой
         await message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
     except Exception as e:
         logger.error(f"Ошибка в обработчике /start: {e}")
         await message.answer("Произошла ошибка при обработке команды /start.")
 
+
+@callback_router.message(Command('profile'))
+async def cmd_start(message: types.Message):
+    user_info = await marzhapi.get_user_info(message.from_user.id)
+    image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
+    logger.info(f"Отправляем сообщение для получения профиля.")
+    if user_info["subscription_status"] == 'active':
+        sub_status = "✅ Активна"
+    elif user_info["subscription_status"] == 'disabled' or 'expired':
+        sub_status = "❌ Не активна"
+
+    else:
+        sub_status = "❓ Неизветсна ошибка"
+
+    text = f'<b>Подписка: {sub_status}</b>\n' \
+           f'├ ID: {message.from_user.id}\n' \
+           f'├ Осталось дней: {user_info["remaining_days"]}\n' \
+           f'└ Активна до: {user_info["expire_date"]}'  # ├└
+    await message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.get_profile_kb(),
+                                        parse_mode="HTML")
 
 # Обработчик нажатий на кнопки
 @callback_router.callback_query(F.data.in_(['buyvpn', 'chose_device','back_to_menu']))
@@ -111,15 +123,34 @@ async def handle_button_click(callback: types.CallbackQuery):
             image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
             logger.info(f"Отправляем сообщение для получения меню.")
             text = '<b>Добро пожаловать в VOX VPN!</b>' \
-                   '\n\nМы гарантируем стабильность и высокую скорость!' \
-                   '\n\nА главное – наш VPN отлично работает как на телефоне, так и на ПК.' \
-                   '\n\nПогнали!' \
-                   '\n\n<b>Поддержка</b> @voxwork' \
-                   '\n<b>Новостной канал</b> @voxglobal' \
-                   '\n\nС уважением,' \
-                   '\nКоманда VOX VPN ⚡️'
-            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(), parse_mode="HTML")
+               '\n\nМы гарантируем <b>стабильное соединение</b> и <b>высокую скорость</b> для комфортного использования.' \
+               '\n\n<b>Один аккаунт — на всех устройствах:</b> VPN идеально работает как на <b>телефоне</b>, так и на <b>ПК.</b>' \
+               '\n\n<b>Погнали!</b>' \
+               '\n\n<b>🔹 Поддержка</b> @voxwork' \
+               '\n🔹 <b>Отзывы</b> @voxglobal' \
+               '\n🔸 <b>Профиль</b> /profile' \
+               '\n\n<b>С уважением,</b>' \
+               '\n<b>Команда VOX VPN</b> ⚡️'
+            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.main_menu(),
+                                                parse_mode="HTML")
+        elif action == 'profile':
+            user_info = await marzhapi.get_user_info(callback.from_user.id)
+            image_path = "AgACAgQAAxkBAAIBamdU23ZiPgSLkqOIZrRXLYXBznSnAAJ-xjEb8PmgUo683NEpncO2AQADAgADeQADNgQ"
+            logger.info(f"Отправляем сообщение для получения профиля.")
+            if user_info["subscription_status"] == 'active':
+                sub_status = "✅ Активна"
+            elif user_info["subscription_status"] == 'disabled' or 'expired':
+                sub_status = "❌ Не активна"
 
+            else:
+                sub_status = "❓ Неизветсна ошибка"
+
+            text = f'<b>Подписка: {sub_status}</b>\n' \
+                   f'├ ID: {callback.from_user.id}\n' \
+                   f'├ Осталось дней: {user_info["remaining_days"]}\n' \
+                   f'└ Активна до: {user_info["expire_date"]}'  # ├└
+            await callback.message.answer_photo(photo=image_path, caption=text, reply_markup=user_keyboards.get_profile_kb(),
+                                                parse_mode="HTML")
         # Отвечаем на callback
         # await callback.answer(f"Вы выбрали: {action}")
 
@@ -127,51 +158,6 @@ async def handle_button_click(callback: types.CallbackQuery):
         logger.error(f"Ошибка при обработке нажатия кнопки: {e}")
         await callback.answer("Произошла ошибка при обработке вашего запроса.")
 
-# @callback_router.callback_query(F.data == 'profile')
-# async def profile_cb(callback: CallbackQuery):
-#     user_info = await marzhapi.get_user_info(callback.from_user.id)
-#
-#     if user_info["subscription_status"] == 'active':
-#         sub_status = "✅ Активна"
-#     elif user_info["subscription_status"] == 'disabled' or 'expired':
-#         sub_status = "❌ Не активна"
-#
-#     else:
-#         sub_status = "❓ Неизветсна ошибка"
-#
-#     text = f'<b>Подписка: {sub_status}</b>\n' \
-#            f'├ ID: {callback.from_user.id}\n' \
-#            f'├ Осталось дней: {user_info["remaining_days"]}\n' \
-#            f'└ Активна до: {user_info["expire_date"]}'#├└
-#
-#     await handle_message_edit(callback, text, user_keyboards.get_profile_kb())
-
-
-# @callback_router.callback_query(F.data == 'back_to_menu')
-# async def back_to_main_cb(callback: CallbackQuery):
-#     main_menu = 'Nock VPN — безопасная защита для вашей онлайн-жизни.\n' \
-#                 '\n' \
-#                 '🔥 Приобретайте подписку Nock VPN от 190₽\n' \
-#                 '\n' \
-#                 '⚡️ Подключайтесь к VPN, жмите на кнопку «Подключится»\n' \
-#                 '\n' \
-#                 'Вы можете управлять ботом следующими командами:'
-#
-#     await handle_message_edit(callback, main_menu, user_keyboards.get_main_kb())
-
-
-# @callback_router.callback_query(F.data == 'buyvpn')
-# async def buyvpn_cb(callback: CallbackQuery):
-#     text = 'Для полного доступа выберите удобный для вас тариф:' \
-#            '\n\n190₽ / 1 мес' \
-#            '\n500₽ / 3 мес' \
-#            '\n900₽ / 6 мес' \
-#            '\n\n💳 К оплате принимаются карты РФ:' \
-#            '\nVisa, MasterCard, МИР и криптовалюты.'
-#
-#
-#     await handle_message_edit(callback, text, user_keyboards.get_buyvpn_kb())
-#
 
 async def handle_subscription(callback: CallbackQuery, months: int):
     user_id = callback.from_user.id
@@ -196,17 +182,6 @@ async def handle_subscription(callback: CallbackQuery, months: int):
     await callback.message.answer(text=text, reply_markup=user_keyboards.get_payment_kb(payment_link, transfer_url))
 
 
-
-    # await handle_message_edit(callback, text, user_keyboards.get_payment_kb(months, payment_link, None))
-    # payment_link, error = await create_payment(user_id, months)
-    # if payment_link:
-    #     text = f'Доступ на {months} {month_text}'
-    #     crypto_payment_url = f'https://crypto-payment.example.com/{months}_months'  # Замените на реальную ссылку
-    #     await handle_message_edit(callback, text, user_keyboards.get_payment_kb(months, payment_link, crypto_payment_url))
-    # else:
-    #     await callback.message.answer(f"Ошибка создания ссылки: {error}")
-    # await callback.message.answer(f'Для оплаты обратитесь в <a href="https://t.me/NockVPN_support">поддержку</a>', parse_mode='HTML')
-
 @callback_router.callback_query(F.data.startswith('test_payment_'))
 async def test_payment_cb(callback: CallbackQuery):
     months = int(callback.data.split('_')[-1])
@@ -230,28 +205,21 @@ async def test_payment_cb(callback: CallbackQuery):
 async def buyvpn_1_cb(callback: CallbackQuery):
     await handle_subscription(callback, 1)
 
+
 @callback_router.callback_query(F.data == 'buyvpn_3')
 async def buyvpn_3_cb(callback: CallbackQuery):
     await handle_subscription(callback, 3)
 
+
 @callback_router.callback_query(F.data == 'buyvpn_6')
 async def buyvpn_6_cb(callback: CallbackQuery):
     await handle_subscription(callback, 6)
+
+
 @callback_router.callback_query(F.data == 'buyvpn_7')
 async def buyvpn_6_cb(callback: CallbackQuery):
     await handle_subscription(callback, 7)
 
-
-@callback_router.callback_query(F.data == 'connect')
-async def trial_shadowsocks_cb(callback: CallbackQuery):
-    text = 'Выберите тип подключения 👇\n' \
-           'Рекомендуем Vless'
-    await handle_message_edit(callback, text, user_keyboards.get_connect_kb())
-
-# @callback_router.callback_query(F.data == 'chose_device')
-# async def chose_device(callback: CallbackQuery):
-#     text = f'{callback.from_user.first_name}, выберите тип вашего устройства ниже 👇 чтобы увидеть инструкцию по подключению'
-#     await handle_message_edit(callback, text, user_keyboards.get_chose_device_kb())
 
 @callback_router.callback_query(F.data.startswith('device_'))
 async def device_connect(callback: CallbackQuery):
@@ -282,39 +250,14 @@ async def device_connect(callback: CallbackQuery):
         # Добавьте другие устройства здесь
     }
     urls = DEVICE_URLS[device]
-    text = f"Подключение к VOX VPN для {urls['device']}" \
-           "\nВам нужно сделать всего 2 шага:" \
-           "\n\n1. Скачайте и установите приложение перейдя по кнопке." \
-           "\n\n(обязательно откройте приложение после установки и разрешите для уставки VPN профилей.)" \
-           "\n\n2. Нажмите на кнопку «ПОДКЛЮЧИТЬСЯ»" \
-           "\n\n\n🚨 <b>Бесплатный период действует 3 дня!</b>" \
-           "\n\n\nПоддержка 24/7: @voxwork"
-
+    text = f"<b>Подключение к VOX VPN для {urls['device']} за 2 шага:</b>" \
+           "\n\n1. <b>Скачайте приложение.</b> " \
+           "\nПосле установки обязательно откройте приложение и подтвердите разрешение на установку VPN-профилей." \
+           "\n\n2. <b>Нажмите на кнопку «ПОДКЛЮЧИТЬСЯ».</b>" \
+           "\n\n🚨 <b>Первые 7 дней – абсолютно бесплатно!</b>" \
+           "\n\n💬 Круглосуточная поддержка: @voxwork"
 
     await handle_message_edit(callback, text, user_keyboards.get_device_kb(urls["download_url"], urls["connect_url"] ))
-
-
-
-@callback_router.callback_query(F.data == 'vless')
-async def trial_vless_cb(callback: CallbackQuery):
-    text = '🪐 Подключение к VPN:' \
-           '\n' \
-           '\nВаша ссылка:' \
-           f'\n└<code>{SUB_URL}/{encode(callback.from_user.id)}</code>' \
-           '\nНажмите (тапните) чтобы скопировать и добавьте в приложение' \
-           '\n' \
-           '\nЕсли приложение уже установлено - воспользуйтесь <b>быстрым подключением</b>' \
-           '\n- <a href="https://apps.apple.com/us/app/streisand/id6450534064">Streisand</a> - для iOS 🍏' \
-           '\n- <a href="https://play.google.com/store/apps/details?id=com.v2ray.ang">v2rayNG</a> - для Android 🤖' \
-           '\n' \
-           '\nПодключить в <b>1 клик!</b>' \
-           f'\n<a href="https://apps.artydev.ru/?url=streisand://import/{SUB_URL}/{encode(callback.from_user.id)}#Nock%20VPN">iOS</a>' \
-           f'\n<a href="https://apps.artydev.ru/?url=v2rayng://install-config?url={SUB_URL}/{encode(callback.from_user.id)}">Android</a>' \
-           '\n' \
-           '\n⭐️ Если у вас Android(v2rayNG) - нажмите в приложении "..." - Обновить подписку' \
-           '\n' \
-           '\nПосмотреть подробную инструкцию 👇'
-    await handle_message_edit(callback, text, user_keyboards.get_vless_con_kb())
 
 
 @callback_router.message(F.content_type == 'video')
@@ -324,95 +267,20 @@ async def get_file_id(message: types.Message):
     await message.reply(f"Ваш file_id: {file_id}")
 
 
-# Обработчик callback-запросов для отправки видео
-@callback_router.callback_query(lambda callback: callback.data in ['video_ios', 'video_mac', 'video_win', 'video_android'])
-async def send_video(callback: types.CallbackQuery):
+@callback_router.callback_query(F.data == 'instruction')
+async def handle_connect(callback: CallbackQuery):
+    logging.debug(f"instruction")
     try:
-        # Словарь с параметрами для разных платформ
-        video_data = {
-            'video_ios': {
-                'file_id': 'BAACAgQAAxkBAAIBOmcaHKmob-v6srPRPIM16-Il2YYmAAIkGAACmHxpUHQBCLbNDQn9NgQ',
-                'caption': "Видео инструкция для IOS 🍏"
-            },
-            'video_mac': {
-                'file_id': 'BAACAgQAAxkBAAIBPWcaHRElJOlM15LVME9Sa2w5X1MyAALbFQACmr6wUHidqln6cqO-NgQ',
-                'caption': "Видео инструкция для mac OS"
-            },
-            'video_win': {
-                'file_id': 'BAACAgIAAxkBAAMiZxj65u4ZxQldw3Sxg3H7KxL2-v0AAvJVAAJcmMlIyZHuytJiyn82BA',
-                'caption': "Видео инструкция для Windows"
-            },
-            'video_android': {
-                'file_id': 'BAACAgIAAxkBAAMiZxj65u4ZxQldw3Sxg3H7KxL2-v0AAvJVAAJcmMlIyZHuytJiyn82BA',
-                'caption': "Видео инструкция для Android"
-            }
-        }
-
-        # Получаем параметры в зависимости от платформы
-        video_info = video_data.get(callback.data, {})
-        file_id = video_info.get('file_id')
-        caption = video_info.get('caption', "Видео инструкция")
-
-        # Клавиатура для всех платформ одинакова
-        keyboard = user_keyboards.get_support_kb()
-
-        # Отправляем видео
-        if file_id:
-            await callback.message.answer_video(
-                video=file_id,
-                caption=caption
-            )
-
-            # Отправляем текст с клавиатурой после видео
-            await callback.message.answer(
-                text='🌐 Проблемы с подключением ???\n\n❗️Напишите оператору, мы работаем 24/7 👇',
-                reply_markup=keyboard
-            )
-        else:
-            await callback.message.answer("Не удалось найти видео для выбранной платформы.")
-
+        await callback.message.delete()
     except Exception as e:
-        await callback.message.answer(f"Ошибка при отправке: {str(e)}")
-
-
-# /sub/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMSIsImFjY2VzcyI6InN1YnNjcmlwdGlvbiIsImlhdCI6MTcxNjQwOTE0Nn0.0JnskQ2WHt_JEj6v5xUzD85-vjcHzi1eF92IyS4URug
-# /sub/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMSIsImFjY2VzcyI6InN1YnNjcmlwdGlvbiIsImlhdCI6MTcxNjQxMDA5OX0.7MjY1IDfK1T97zSUrWH-e42ySV3mreD_lSL4qYnkJNc
-
-
-# @callback_router.callback_query(F.data.startswith('outline'))
-# async def trial_shadowsocks_cb(callback: CallbackQuery):
-#     text = '🪐 Подключение к Outline VPN:' \
-#            '\n\n<code>ssconf://users.outline.artydev.ru/conf/959fc2d1ec5e0x1af70d27#nRomania</code>' \
-#             '\n👆 Нажмите чтобы скопировать!' \
-#            '\n\nПосмотреть 👉 инструкцию (https://telegra.ph/Podklyuchenie-k-Outline-VPN-08-11)'
-#
-#     await callback.message.edit_text(text=text, reply_markup=user_keyboards.get_connected_kb(), parse_mode='HTML',disable_web_page_preview=True)
-
-
-
-
-# @callback_router.callback_query(F.data.startswith('trial_shadowsocks_'))
-# async def trial_shadowsocks_cb(callback: CallbackQuery):
-#     country_id = callback.data.split('_')[-1]
-#     print(f'{country_id}')
-#     if country_id == "nl":
-#         panel = Marzban(os.getenv("MARZH_LOGIN"), os.getenv("MARZH_PWD"), "https://vm13139.vpsone.xyz")
-#         token = await panel.get_token()
-#         expire_time = datetime.utcnow() + timedelta(days=1)  # Установка времени истечения срока действия на 1 день
-#         expire_timestamp = int(expire_time.timestamp())
-#         user = User(
-#             username="new_user",  # Задайте уникальное имя пользователя
-#             proxies={
-#                 "shadowsocks": {}
-#             },
-#             inbounds={"shadowsocks": ["Shadowsocks TCP"]},  # Установка входящих соединений для Shadowsocks
-#             expire=expire_timestamp,  # Установка времени истечения срока действия
-#             data_limit=1024 * 1024 * 1024 * 15,  # Установка лимита данных, если необходимо
-#             data_limit_reset_strategy="no_reset",  # Стратегия сброса лимита данных
-#             status="active"  # Статус пользователя
-#         )
-#
-#         result = await panel.add_user(user=user, token=token)
-#
-#         await callback.message.edit_text(text=result.links[0], reply_markup=await user_keyboards.get_trial_shadowsocks_countries_kb())
+        logger.error(f"Не удалось удалить сообщение: {e}")
+    try:
+        file_id = 'BAACAgQAAxkBAAICxmdzBJIqk6Ob5ShY3gg1X_Dbhl7-AAJbFgACQUCYU-1mPTKcdol_NgQ'
+        await callback.message.answer_video(video=file_id,
+                                            reply_markup=user_keyboards.get_instruction_kb())
+    except:
+        await callback.message.answer(
+            text=f'Видео не найдено',
+            parse_mode='HTML'
+        )
 

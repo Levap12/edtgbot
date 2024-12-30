@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # @cached(ttl=600)
 async def get_panel_and_token():
-    logging.debug(f"LOGIN, PASS, PANEL_URL: {LOGIN},{PASS},{PANEL_URL}")
+    # logging.debug(f"LOGIN, PASS, PANEL_URL: {LOGIN},{PASS},{PANEL_URL}")
 
     url = f"{PANEL_URL}/api/admin/token"  # URL для авторизации, если он отличается, нужно изменить
     headers = {
@@ -234,7 +234,7 @@ async def crate_user(user_id: int):
         logger.debug("Got panel and token")
 
         # Устанавливаем время истечения срока действия аккаунта через 3 дня
-        expire_time = datetime.utcnow() + timedelta(days=3)  # Установка времени истечения срока действия на 3 дня
+        expire_time = datetime.utcnow() + timedelta(days=7)  # Установка времени истечения срока действия на 3 дня
         expire_timestamp = int(expire_time.timestamp())
 
         # Формируем данные для нового пользователя
@@ -326,29 +326,45 @@ async def crate_user(user_id: int):
 async def get_user_info(user_id):
     logger.debug(f"get_user_info called with user_id={user_id}")
 
+    url = f"{PANEL_URL}/api/user/{user_id}"
+    token = await get_panel_and_token()
     try:
-        panel, token = await get_panel_and_token()
-        logger.debug("Got panel and token")
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json"
+            }
+            # params = {
+            #     "user_id": user_id
+            # }
 
-        user_data = await panel.get_user(str(user_id), token=token)
-        logger.debug(f"Got user data: {user_data}")
+            logger.debug(f"Sending request to {url}")
 
-        # Статус подписки
-        subscription_status = user_data.status
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    user_data = await response.json()
+                    logger.debug(f"Got user data: {user_data}")
+                else:
+                    error_message = await response.text()
+                    logger.error(f"Error response from server: {response.status}, {error_message}")
+                    response.raise_for_status()
 
-        # Дата окончания подписки
-        expire_timestamp = user_data.expire
+        # Extract subscription status
+        subscription_status = user_data.get("status", "unknown")
+
+        # Extract subscription expiration timestamp
+        expire_timestamp = user_data.get("expire")
 
         if expire_timestamp is None:
-            # Если подписка бесконечна
+            # Infinite subscription
             expire_formatted = "∞"
-            remaining_days = "∞"  # или другое значение, чтобы обозначить бесконечность
+            remaining_days = "∞"
         else:
-            # Если подписка имеет срок окончания
+            # Finite subscription
             expire_date = datetime.utcfromtimestamp(expire_timestamp)
             expire_formatted = expire_date.strftime('%d.%m.%Y')
 
-            # Осталось дней
+            # Days remaining
             now = datetime.utcnow()
             remaining_days = (expire_date - now).days if expire_date > now else 0
 
