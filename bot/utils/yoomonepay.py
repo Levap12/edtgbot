@@ -19,7 +19,7 @@ def get_amount_and_description(months):
     if months == 1:
         return 200, "VOX 1 месяц"
     elif months == 3:
-        return 600, "VOX 3 месяца"
+        return 500, "VOX 3 месяца"
     elif months == 6:
         return 900, "VOX 6 месяцев"
     elif months == 7:
