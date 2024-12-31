@@ -275,7 +275,7 @@ async def handle_connect(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Не удалось удалить сообщение: {e}")
     try:
-        file_id = 'BAACAgQAAxkBAAICxmdzBJIqk6Ob5ShY3gg1X_Dbhl7-AAJbFgACQUCYU-1mPTKcdol_NgQ'
+        file_id = 'BAACAgQAAxkBAAIHNmdz0HhbelJBxB-wkP__aL8D_mEoAAJbFgACQUCYUxGufhvsFKLcNgQ'
         await callback.message.answer_video(video=file_id,
                                             reply_markup=user_keyboards.get_instruction_kb())
     except:
